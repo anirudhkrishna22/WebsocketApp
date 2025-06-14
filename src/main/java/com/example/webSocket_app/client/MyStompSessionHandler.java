@@ -19,6 +19,7 @@ public class MyStompSessionHandler extends StompSessionHandlerAdapter {
     public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
         try {
             System.out.println("client connected!");
+            session.send("/app/connect", username);
             // To achieve that, we will subscribe to that route (/topic/messages) and then instantiate a StompFrameHandler object.
             session.subscribe("/topic/messages", new StompFrameHandler() {
                 @Override

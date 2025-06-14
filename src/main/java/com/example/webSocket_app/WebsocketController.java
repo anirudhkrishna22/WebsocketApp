@@ -8,11 +8,14 @@ import org.springframework.stereotype.Controller;
 
 @Controller
 public class WebsocketController {
+    // used to send messages to connected clients. It abstracts the process of interacting with a message broker.
     private final SimpMessagingTemplate messagingTemplate;
+    private final WebSocketSessionManager sessionManager;
 
     @Autowired
-    public WebsocketController(SimpMessagingTemplate messagingTemplate){
+    public WebsocketController(SimpMessagingTemplate messagingTemplate, WebSocketSessionManager sessionManager){
         this.messagingTemplate = messagingTemplate;
+        this.sessionManager = sessionManager;
     }
 
     @MessageMapping("/message")
@@ -20,5 +23,19 @@ public class WebsocketController {
         System.out.println("Received message from user: " + message.getUser() + ": " + message.getMessage());
         messagingTemplate.convertAndSend("/topic/messages", message);
         System.out.println("sent message to /topic/messages: " + message.getUser() + ": " + message.getMessage());
+    }
+
+    @MessageMapping("/connect")
+    public void connectUser(String username){
+        sessionManager.addUsername(username);
+        sessionManager.broadcastActiveUsernames();
+        System.out.println("User " + username + " connected!!");
+    }
+
+    @MessageMapping("/disconnect")
+    public void disconnect(String username){
+        sessionManager.removeUsername(username);
+        sessionManager.broadcastActiveUsernames();
+        System.out.println("user " + username + " got disconnected");
     }
 }
