@@ -4,12 +4,15 @@ import com.example.webSocket_app.Message;
 import org.springframework.messaging.simp.stomp.*;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 
 // This class will handle what will happen after user connects or disconnects with the websocket. It basically manages the websocket connection
 public class MyStompSessionHandler extends StompSessionHandlerAdapter {
     private String username;
+    private MessageListener messageListener;
 
-    public MyStompSessionHandler(String username){
+    public MyStompSessionHandler(MessageListener messageListener, String username){
+        this.messageListener = messageListener;
         this.username = username;
     }
 
@@ -19,7 +22,6 @@ public class MyStompSessionHandler extends StompSessionHandlerAdapter {
     public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
         try {
             System.out.println("client connected!");
-            session.send("/app/connect", username);
             // To achieve that, we will subscribe to that route (/topic/messages) and then instantiate a StompFrameHandler object.
             session.subscribe("/topic/messages", new StompFrameHandler() {
                 @Override
@@ -32,6 +34,7 @@ public class MyStompSessionHandler extends StompSessionHandlerAdapter {
                     try {
                         if (payload instanceof Message) {
                             Message message = (Message) payload;
+                            messageListener.onMessageReceived(message);
                             System.out.println("Received message: " + message.getUser() + ": " + message.getMessage());
                         } else {
                             System.out.println("Received unexpected payload type: " + payload.getClass());
@@ -42,6 +45,32 @@ public class MyStompSessionHandler extends StompSessionHandlerAdapter {
                 }
             });
             System.out.println("client subscribed to /topic/messages");
+
+            session.subscribe("/topic/users", new StompFrameHandler() {
+                @Override
+                public Type getPayloadType(StompHeaders headers) {
+                    return new ArrayList<String>().getClass();
+                }
+
+                @Override
+                public void handleFrame(StompHeaders headers, Object payload) {
+                    try{
+                        if(payload instanceof ArrayList){
+                            ArrayList<String> activeUsers = (ArrayList<String>) payload;
+                            messageListener.onActiveUsersUpdated(activeUsers);
+                            System.out.println("received active users" + activeUsers);
+                        }
+                    }catch(Exception e){
+                        e.printStackTrace();
+                    }
+                }
+            });
+            System.out.println("subscribed to /topic/users");
+
+            session.send("/app/connect", username);
+            // asking the websocket server to broadcast active users again. This is needed when a new client gets connected (due to threading issues)
+            session.send("/app/request-users", "");
+
         } catch (Exception ex) {
             System.out.println(ex);
         }
